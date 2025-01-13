@@ -13,3 +13,5 @@
 *.hdf5
 
 *.iml
+*.xml
+.idea
