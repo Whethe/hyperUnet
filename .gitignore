@@ -1,0 +1,13 @@
+# 忽略所有图片文件
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.tiff
+*.svg
+*.webp
+
+# 忽略HDF5文件
+*.h5
+*.hdf5
