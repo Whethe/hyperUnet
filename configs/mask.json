@@ -1,0 +1,14 @@
+{
+  "task": "swinmr_CCnpi_G1D30"
+  , "model": "swinmr_npi"
+  , "mask": "fMRI_Reg_AF16_CF0.02_PE256"
+  , "gpu_ids": [0, 1]
+  , "dist": false
+  , "n_channels": 1
+  , "manual_seed": 42
+  , "path": {
+    "root": "mri_recon"
+    , "pretrained_netG": null
+    , "pretrained_netE": null
+    }
+}

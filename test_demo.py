@@ -1,4 +1,5 @@
 import argparse
+import json
 from collections import defaultdict
 from datetime import datetime
 
@@ -15,25 +16,28 @@ def initArgs(arguments):
     config_path = arguments.config
     with open(config_path, "r") as fr:
         configs = yaml.load(fr, Loader=yaml.FullLoader)
-    device = arguments.device
+    device = 'cuda'
+
+    mask_path = args.masks
+    with open(mask_path, "r") as f:
+        opt = json.load(f)
 
     # Read configs
-    n_layers = configs['n_layers']
-    k_iters = configs['k_iters']
-
-    n = configs['n']
+    n_channels = configs['n_channels']
+    n_classes = configs['n_classes']
+    n = configs['ph_n']
 
     dataset_name = configs['dataset_name']
     dataset_params = configs['dataset_params']
-    dataset_params['samplerate'] = arguments.samplerate
+    dataset_params['opt'] = opt
 
     batch_size = configs['batch_size'] if arguments.batch_size is None else arguments.batch_size
 
     model_name = configs['model_name']
     model_params = configs.get('model_params', {})
-    model_params['n_layers'] = n_layers
-    model_params['k_iters'] = k_iters
-    model_params['phconv_params'] = n
+    model_params['n_channels'] = n_channels
+    model_params['n_classes'] = n_classes
+    model_params['ph_n'] = n
 
     score_names = configs['score_names']
 
@@ -68,10 +72,10 @@ def main(arguments):
 
     model.eval()
     for i, (x, y, csm, mask) in enumerate(tqdm(dataloader)):
-        x, csm, mask = x.to(device), csm.to(device), mask.to(device)
+        x = x.to(device)
 
         with torch.no_grad():
-            y_pred = model(x, csm, mask).detach().cpu()
+            y_pred = model(x).detach().cpu()
 
         y = np.abs(r2c(y.numpy(), axis=1))
         y_pred = np.abs(r2c(y_pred.numpy(), axis=1))
@@ -102,14 +106,18 @@ def main(arguments):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="")
-    parser.add_argument("--config", type=str, required=False, default="configs/test_hyper, k=1.yaml",
+    parser.add_argument("--config", type=str, required=False, default="configs/test_channel=2.yaml",
                         help="config file path")
-    parser.add_argument("--device", type=str, required=False, default="cpu",
-                        help="[cpu / cuda]")
+    parser.add_argument("--masks", type=str, required=False, default="configs/mask.json",
+                        help="config file path")
     parser.add_argument("--workspace", type=str, default='./workspace')
+    parser.add_argument("--tensorboard_dir", type=str, default='./runs')
+    parser.add_argument("--save_step", type=int, default=10)
+    parser.add_argument("--write_lr", type=bool, default=False)
     parser.add_argument("--batch_size", type=int, default=None)
-    parser.add_argument("--write_image", type=int, default=1)
-    parser.add_argument("--samplerate", type=int, default=8)
+    parser.add_argument("--write_image", type=int, default=10)
+    parser.add_argument("--write_lambda", type=bool, default=True)
+    parser.add_argument("--seed", type=int, default=1)
 
     args = parser.parse_args()
 

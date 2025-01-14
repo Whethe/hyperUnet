@@ -1,4 +1,5 @@
 import argparse
+import json
 import os, time, yaml
 from tqdm import tqdm
 from datetime import datetime
@@ -11,18 +12,22 @@ def setup(args):
     config_path = args.config
     with open(config_path, "r") as fr:
         configs = yaml.load(fr, Loader=yaml.FullLoader)
+
+    mask_path = args.masks
+    with open(mask_path, "r") as f:
+        opt = json.load(f)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     #read configs =================================
-    n_layers = configs['n_layers']
-    k_iters = configs['k_iters']
+    n_channels = configs['n_channels']
+    n_classes = configs['n_classes']
+    n = configs['ph_n']
     epochs = configs['epochs']
-
-    n = configs['n']
 
     dataset_name = configs['dataset_name']
     dataset_params = configs['dataset_params']
-    dataset_params['samplerate'] = args.samplerate
+    # dataset_params['samplerate'] = args.samplerate
+    dataset_params['opt'] = opt
     val_data = configs['val_data']
     phases = ['train', 'val'] if val_data else ['train']
 
@@ -30,9 +35,9 @@ def setup(args):
 
     model_name = configs['model_name']
     model_params = configs.get('model_params', {})
-    model_params['n_layers'] = n_layers
-    model_params['k_iters'] = k_iters
-    model_params['phconv_params'] = n
+    model_params['n_channels'] = n_channels
+    model_params['n_classes'] = n_classes
+    model_params['ph_n'] = n
 
     restore_weights = configs['restore_weights'] #'model', 'all', False
 
@@ -107,10 +112,10 @@ def main(args):
             else: model.eval()
 
             for i, (x, y, csm, mask) in enumerate(tqdm(dataloaders[phase])):
-                x, y, csm, mask = x.to(device), y.to(device), csm.to(device), mask.to(device)
+                x = x.to(device)
 
                 with torch.set_grad_enabled(phase=='train'):
-                    y_pred = model(x, csm, mask)
+                    y_pred = model(x).cpu()
                     loss = loss_f(y_pred, y)
 
                 if phase == 'train':
@@ -139,9 +144,9 @@ def main(args):
             if args.write_image > 0 and (epoch % args.write_image == 0):
                 writers[phase].add_figure('img', display_img(np.abs(r2c(x[-1].detach().cpu().numpy())), mask[-1].detach().cpu().numpy(), \
                     y[-1], y_pred[-1], epoch_score[val_score_name]), epoch)
-            if args.write_lambda:
-                print('lam:', model.dc.lam.item())
-                writers['train'].add_scalar('lambda', model.dc.lam.item(), epoch)
+            # if args.write_lambda:
+            #     print('lam:', model.lam.item())
+            #     writers['train'].add_scalar('lambda', model.lam.item(), epoch)
 
             logger.write('epoch {}/{} {} score: {:.4f}\tloss: {:.4f}'.format(epoch, epochs, phase, epoch_score[val_score_name], epoch_score['loss']))
 
@@ -164,7 +169,9 @@ def main(args):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="")
-    parser.add_argument("--config", type=str, required=False, default="configs/hyper_modl, k=10.yaml",
+    parser.add_argument("--config", type=str, required=False, default="configs/hyper_unet, channels=2.yaml",
+                        help="config file path")
+    parser.add_argument("--masks", type=str, required=False, default="configs/mask.json",
                         help="config file path")
     parser.add_argument("--workspace", type=str, default='./workspace')
     parser.add_argument("--tensorboard_dir", type=str, default='./runs')
@@ -173,7 +180,6 @@ if __name__ == "__main__":
     parser.add_argument("--write_image", type=int, default=0)
     parser.add_argument("--write_lambda", type=bool, default=True)
     parser.add_argument("--seed", type=int, default=1)
-    parser.add_argument("--samplerate", type=int, default=12)
 
     args = parser.parse_args()
 

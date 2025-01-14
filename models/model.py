@@ -2,46 +2,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from PHConv2D import PHConv2d
-
-
-class ChannelAttention(nn.Module):
-    def __init__(self, in_channels, reduction_ratio=16):
-        super(ChannelAttention, self).__init__()
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        self.max_pool = nn.AdaptiveMaxPool2d(1)
-
-        reduction_channels = max(8, in_channels // reduction_ratio)
-
-        self.fc = nn.Sequential(
-            nn.Linear(in_channels, reduction_channels),
-            nn.ReLU(inplace=True),
-            nn.Linear(reduction_channels, in_channels)
-        )
-
-    def forward(self, x):
-        b, c, _, _ = x.size()
-
-        # average pool
-        avg_out = self.fc(self.avg_pool(x).view(b, c))
-        # max pool
-        max_out = self.fc(self.max_pool(x).view(b, c))
-
-        out = avg_out + max_out
-        return torch.sigmoid(out).view(b, c, 1, 1)
-
-
-class CBAM(nn.Module):
-    def __init__(self, in_channels, reduction_ratio=16, kernel_size=7):
-        super(CBAM, self).__init__()
-        self.channel_att = ChannelAttention(in_channels, reduction_ratio)
-        # self.spatial_att = SpatialAttention(kernel_size)
-
-    def forward(self, x):
-        x = x * self.channel_att(x)
-        # x = x * self.spatial_att(x)
-        return x
-
+from models import PHConv2d
 
 class DoubleConv(nn.Module):
     """(PHConv2d => [BN] => ReLU) * 2"""
@@ -66,11 +27,8 @@ class DoubleConv(nn.Module):
             nn.ReLU(inplace=True)
         )
 
-        self.attention = CBAM(out_channels)
-
     def forward(self, x):
         x = self.double_conv(x)
-        x = self.attention(x)
         return x
 
 

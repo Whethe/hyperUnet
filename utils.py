@@ -222,3 +222,47 @@ def display_img(x, mask, y, y_pred, score=None):
     if score:
         plt.suptitle('score: {:.4f}'.format(score))
     return fig
+
+
+def pad_kspace(kspace, target_size=(256, 256)):
+    """kspace padding to target size
+    Args:
+        kspace: org kspace，shape (H, W) or (batch, H, W)
+        target_size: target size，default (256, 256)
+
+    Returns:
+        padded_kspace: padding后的kspace
+    """
+    if isinstance(kspace, np.ndarray):
+        kspace = torch.from_numpy(kspace)
+    if kspace.ndim == 2:
+        kspace = kspace[None, ...]  # add batch dim
+        single_image = True
+    else:
+        single_image = False
+
+    B, H, W = kspace.shape
+    target_H, target_W = target_size
+
+    pad_H = target_H - H if target_H > H else 0
+    pad_W = target_W - W if target_W > W else 0
+
+    pad_H_left = pad_H // 2
+    pad_H_right = pad_H - pad_H_left
+    pad_W_left = pad_W // 2
+    pad_W_right = pad_W - pad_W_left
+
+    padded_kspace = torch.nn.functional.pad(
+        kspace,
+        (pad_W_left, pad_W_right, pad_H_left, pad_H_right),
+        mode='constant',
+        value=0
+    )
+
+    if single_image:
+        padded_kspace = padded_kspace[0]
+
+    if isinstance(padded_kspace, torch.Tensor):
+        padded_kspace = padded_kspace.numpy()
+
+    return padded_kspace
